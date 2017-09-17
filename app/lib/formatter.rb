@@ -9,7 +9,7 @@ class Formatter
 
   include ActionView::Helpers::TextHelper
 
-  def format(status)
+  def format(status, options = {})
     if status.reblog?
       prepend_reblog = status.reblog.account.acct
       status         = status.proper
@@ -19,7 +19,11 @@ class Formatter
 
     raw_content = status.text
 
-    return reformat(raw_content) unless status.local?
+    unless status.local?
+      html = reformat(raw_content)
+      html = encode_custom_emojis(html, status.emojis) if options[:custom_emojify]
+      return html
+    end
 
     linkable_accounts = status.mentions.map(&:account)
     linkable_accounts << status.account
@@ -27,6 +31,7 @@ class Formatter
     html = raw_content
     html = "RT @#{prepend_reblog} #{html}" if prepend_reblog
     html = encode_and_link_urls(html, linkable_accounts)
+    html = encode_custom_emojis(html, status.emojis) if options[:custom_emojify]
     html = simple_format(html, {}, sanitize: false)
     html = html.delete("\n")
 
@@ -72,6 +77,24 @@ class Formatter
         link_to_hashtag(entity)
       elsif entity[:screen_name]
         link_to_mention(entity, accounts)
+      end
+    end
+  end
+
+  def encode_custom_emojis(html, emojis)
+    return html if emojis.empty?
+
+    emoji_map = emojis.map { |e| [":#{e.shortcode}:", e.image.url] }.to_h
+
+    pattern = /(?<=[^[:alnum:]:]|\n|^)
+      (#{emoji_map.keys.map { |name| Regexp.escape(name) }.join('|')})
+      (?=[^[:alnum:]:]|$)/x
+
+    html.gsub(pattern) do |match|
+      if emoji_map[match]
+        "<img draggable=\"false\" class=\"emojione\" alt=\"#{match}\" title=\"#{match}\" src=\"#{full_asset_url(emoji_map[match])}\" />"
+      else
+        match
       end
     end
   end

@@ -44,6 +44,8 @@ import escapeTextContentForBrowser from 'escape-html';
 
 const domParser = new DOMParser();
 
+const customEmojify = (text, emojis) => emojis.reduce((newText, emoji) => newText.replace(`:${emoji.shortcode}:`, `<img draggable="false" class="emojione" alt=":${emoji.shortcode}:" title=":${emoji.shortcode}:" src="${emoji.url}" />`), text);
+
 const normalizeStatus = (state, status) => {
   if (!status) {
     return state;
@@ -59,8 +61,8 @@ const normalizeStatus = (state, status) => {
 
   const searchContent = [status.spoiler_text, status.content].join(' ').replace(/<br \/>/g, '\n').replace(/<\/p><p>/g, '\n\n');
   normalStatus.search_index = domParser.parseFromString(searchContent, 'text/html').documentElement.textContent;
-  normalStatus.contentHtml = emojify(normalStatus.content);
-  normalStatus.spoilerHtml = emojify(escapeTextContentForBrowser(normalStatus.spoiler_text || ''));
+  normalStatus.contentHtml = customEmojify(emojify(normalStatus.content), normalStatus.emojis);
+  normalStatus.spoilerHtml = customEmojify(emojify(escapeTextContentForBrowser(normalStatus.spoiler_text || '')), normalStatus.emojis);
 
   return state.update(status.id, ImmutableMap(), map => map.mergeDeep(fromJS(normalStatus)));
 };
